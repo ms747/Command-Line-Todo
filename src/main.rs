@@ -1,3 +1,4 @@
+use clap::App;
 use prettytable::{cell, format, row, Table};
 use rusqlite::{params, Connection, Result};
 
@@ -61,6 +62,15 @@ fn main() -> Result<()> {
         params![],
     )?;
 
+    let matches = App::new("Tasks")
+        .version("0.1")
+        .author("Mayur S. <mayur.shah.ha@gmail.com>")
+        .about("Command Line Todo List")
+        .arg("ls, List all todos")
+        .arg("add, add <task> 'Adds Task to Todo'")
+        .arg("update, update <id> <description> 'Updates description for given id'")
+        .args("delete, delete <id> 'Delete Task for given id'")
+        .get_matches();
     let args = std::env::args().skip(1).collect::<Vec<String>>();
 
     if args.len() < 1 || args.len() > 3 {
