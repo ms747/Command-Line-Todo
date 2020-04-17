@@ -10,12 +10,17 @@ struct Task {
 
 fn print_tasks(conn: &rusqlite::Connection) -> Result<()> {
     let mut tasks = conn.prepare("SELECT * from tasks")?;
-    let tasks_iter = tasks.query_map(params![], |row| {
+    let mut tasks_iter = tasks.query_map(params![], |row| {
         Ok(Task {
             id: row.get(0)?,
             description: row.get(1)?,
         })
     })?;
+
+    if tasks_iter.by_ref().count() == 0 {
+        println!("No Tasks");
+        return Ok(());
+    }
 
     let mut task_table = Table::new();
     task_table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
@@ -53,7 +58,12 @@ fn update_task(conn: &rusqlite::Connection, id: u32, description: &str) -> Resul
 }
 
 fn main() -> Result<()> {
-    let conn = Connection::open("./tasks.sqlite")?;
+    let mut db_path = dirs::home_dir().unwrap();
+    db_path.push(".config");
+    db_path.push("task");
+    db_path.push("tasks");
+    db_path.set_extension("db");
+    let conn = Connection::open(db_path)?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS tasks(
             id INTEGER PRIMARY KEY,
