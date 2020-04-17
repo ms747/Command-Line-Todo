@@ -1,4 +1,4 @@
-use clap::App;
+use clap::{App, Arg};
 use prettytable::{cell, format, row, Table};
 use rusqlite::{params, Connection, Result};
 
@@ -66,53 +66,58 @@ fn main() -> Result<()> {
         .version("0.1")
         .author("Mayur S. <mayur.shah.ha@gmail.com>")
         .about("Command Line Todo List")
-        .arg("ls, List all todos")
-        .arg("add, add <task> 'Adds Task to Todo'")
-        .arg("update, update <id> <description> 'Updates description for given id'")
-        .args("delete, delete <id> 'Delete Task for given id'")
+        .arg(
+            Arg::with_name("ls")
+                .help("List all tasks")
+                .short('l')
+                .long("ls"),
+        )
+        .arg(
+            Arg::with_name("add")
+                .help("Add to tasks")
+                .short('a')
+                .long("add")
+                .value_name("TASK"),
+        )
+        .arg(
+            Arg::with_name("update")
+                .help("Update task for given id")
+                .short('u')
+                .long("udpate")
+                .value_names(&["ID", "TASK"]),
+        )
+        .arg(
+            Arg::with_name("delete")
+                .help("Delete task for given id")
+                .short('d')
+                .long("delete")
+                .value_name("ID"),
+        )
         .get_matches();
-    let args = std::env::args().skip(1).collect::<Vec<String>>();
 
-    if args.len() < 1 || args.len() > 3 {
-        eprintln!("USAGE : task <COMMAND> [args...]");
-        eprintln!("COMMANDS : ");
-        eprintln!("add <task>");
-        eprintln!("ls");
-        eprintln!("del <id>");
-        eprintln!("update <id> <description>");
-        std::process::exit(1);
+    // List
+    if matches.is_present("ls") {
+        print_tasks(&conn)?;
     }
-    match args[0].as_str() {
-        "add" => {
-            if args.len() == 2 {
-                add_task(&conn, &args[1])?
-            } else {
-                eprintln!("USAGE : add <task>");
-            }
-        }
-        "ls" => {
-            if args.len() == 1 {
-                print_tasks(&conn)?
-            } else {
-                eprintln!("USAGE : ls");
-            }
-        }
-        "del" => {
-            if args.len() == 2 {
-                delete_task(&conn, args[1].parse::<u32>().unwrap())?
-            } else {
-                eprintln!("USAGE : del <id>");
-            }
-        }
-        "update" => {
-            if args.len() == 3 {
-                update_task(&conn, args[1].parse::<u32>().unwrap(), &args[2])?
-            } else {
-                eprintln!("USAGE : update <id> <description>");
-            }
-        }
-        _ => println!("Feature Not Implemented"),
-    };
+
+    // Add
+    if let Some(value) = matches.value_of("add") {
+        add_task(&conn, value)?;
+    }
+
+    // Update
+    if let Some(value) = matches.values_of("update") {
+        let args = value.collect::<Vec<_>>();
+        let id = args[0].parse::<u32>().unwrap();
+        let description = args[1];
+        update_task(&conn, id, description)?;
+    }
+
+    // Delete
+    if let Some(value) = matches.value_of("delete") {
+        let id = value.parse::<u32>().unwrap();
+        delete_task(&conn, id)?;
+    }
 
     Ok(())
 }
