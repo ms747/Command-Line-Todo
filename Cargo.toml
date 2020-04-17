@@ -10,3 +10,4 @@ edition = "2018"
 rusqlite = "0.22.0"
 prettytable-rs = "^0.8"
 clap = { git = "https://github.com/clap-rs/clap/" }
+dirs = "2.0.2"
