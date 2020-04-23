@@ -9,15 +9,17 @@ struct Task {
 }
 
 fn print_tasks(conn: &rusqlite::Connection) -> Result<()> {
-    let mut tasks = conn.prepare("SELECT * from tasks")?;
-    let mut tasks_iter = tasks.query_map(params![], |row| {
+    let mut tasks_querry = conn.prepare("SELECT * from tasks")?;
+    let tasks_iter = tasks_querry.query_map(params![], |row| {
         Ok(Task {
             id: row.get(0)?,
             description: row.get(1)?,
         })
     })?;
 
-    if tasks_iter.by_ref().count() == 0 {
+    let tasks = tasks_iter.collect::<Vec<_>>();
+
+    if tasks.len() == 0 {
         println!("No Tasks");
         return Ok(());
     }
@@ -25,11 +27,14 @@ fn print_tasks(conn: &rusqlite::Connection) -> Result<()> {
     let mut task_table = Table::new();
     task_table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
     task_table.set_titles(row!["ID", "Description"]);
-    for task in tasks_iter {
+
+    for task in tasks {
         let temp_task = task.unwrap();
         task_table.add_row(row![temp_task.id, temp_task.description]);
     }
+
     task_table.printstd();
+
     Ok(())
 }
 
