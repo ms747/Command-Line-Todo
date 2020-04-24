@@ -1,6 +1,14 @@
 use clap::{App, Arg};
 use prettytable::{cell, format, row, Table};
 use rusqlite::{params, Connection, Result};
+use std::io::prelude::*;
+use std::{
+    env::{temp_dir, var},
+    fs::File,
+    io::Read,
+    process::Command,
+};
+use uuid::Uuid;
 
 #[derive(Debug)]
 struct Task {
@@ -8,6 +16,7 @@ struct Task {
     description: String,
 }
 
+#[allow(dead_code)]
 fn print_tasks(conn: &rusqlite::Connection) -> Result<()> {
     let mut tasks_querry = conn.prepare("SELECT * from tasks")?;
     let tasks_iter = tasks_querry.query_map(params![], |row| {
@@ -62,6 +71,55 @@ fn update_task(conn: &rusqlite::Connection, id: u32, description: &str) -> Resul
     Ok(())
 }
 
+fn update(conn: &rusqlite::Connection, id: u32) -> Result<()> {
+    let mut tasks_querry = conn.prepare("SELECT * from tasks where id = ?")?;
+    let tasks_iter = tasks_querry.query_map(params![id], |row| {
+        Ok(Task {
+            id: row.get(0)?,
+            description: row.get(1)?,
+        })
+    })?;
+
+    let tasks = tasks_iter.collect::<Vec<_>>();
+
+    if tasks.len() == 0 {
+        println!("No Tasks");
+        return Ok(());
+    }
+
+    let mut content = String::new();
+
+    for task in tasks {
+        let temp_task = task.unwrap();
+        content.push_str(temp_task.description.as_str());
+    }
+
+    let editor = var("EDITOR").expect("$EDITOR variable not set");
+    let mut file_path = temp_dir();
+    let uuid = Uuid::new_v4();
+    file_path.push(uuid.to_string());
+    let mut file = File::create(&file_path).expect("unable to create file");
+
+    file.write_all(content.as_bytes())
+        .expect("Unable to set buffer");
+
+    Command::new(editor)
+        .arg(&file_path)
+        .status()
+        .expect("Something went wrong");
+
+    let mut editable = String::new();
+
+    File::open(file_path)
+        .expect("Cound not open file")
+        .read_to_string(&mut editable)
+        .expect("Failed to write buffer");
+
+    update_task(&conn, id, editable.as_str())?;
+    Ok(())
+}
+
+#[allow(dead_code)]
 fn main() -> Result<()> {
     let mut db_path = dirs::home_dir().unwrap();
     db_path.push(".config");
@@ -99,7 +157,7 @@ fn main() -> Result<()> {
                 .help("Update task for given id")
                 .short('u')
                 .long("udpate")
-                .value_names(&["ID", "TASK"]),
+                .value_names(&["ID"]),
         )
         .arg(
             Arg::with_name("delete")
@@ -124,8 +182,9 @@ fn main() -> Result<()> {
     if let Some(value) = matches.values_of("update") {
         let args = value.collect::<Vec<_>>();
         let id = args[0].parse::<u32>().unwrap();
-        let description = args[1];
-        update_task(&conn, id, description)?;
+        update(&conn, id)?;
+        //let description = args[1];
+        //update_task(&conn, id, description)?;
     }
 
     // Delete
